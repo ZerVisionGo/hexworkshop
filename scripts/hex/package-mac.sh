@@ -78,8 +78,10 @@ bun run electron:build
 
 echo "== 打包：${APP_NAME}（自定义 afterPack 去掉 app-update.yml）=="
 rm -rf "$ELECTRON_DIR/release/mac-$ARCH"
+# -c.mac.target=dir：只产出 .app 目录，不做 dmg / zip（省一半时间，也不会生成 app-update.yml）
 ( cd "$ELECTRON_DIR" && npx electron-builder --mac "--$ARCH" \
     --config electron-builder.yml \
+    -c.mac.target=dir \
     -c.afterPack="$ROOT_DIR/scripts/hex/afterPack.cjs" \
     ${BRAND_ARGS[@]+"${BRAND_ARGS[@]}"} )
 
