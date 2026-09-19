@@ -34,6 +34,16 @@ module.exports = async function afterPack(context) {
     } catch {
       console.log('hex afterPack: CFBundleIconName not present')
     }
+    // 主进程启动时会 app.dock.setIcon(dist/resources/icon.png)（apps/electron/src/main/index.ts），
+    // Finder 用 icon.icns、Dock 却用这张 PNG——所以把 bundle 里的 PNG 也换成我们的。
+    const dockPng = path.join(resources, 'app', 'dist', 'resources', 'icon.png')
+    const ourPng = path.join(__dirname, '..', '..', 'resources', 'hex', 'icon-1024.png')
+    if (fs.existsSync(dockPng) && fs.existsSync(ourPng)) {
+      fs.copyFileSync(ourPng, dockPng)
+      console.log('hex afterPack: replaced dist/resources/icon.png (Dock icon)')
+    } else {
+      console.log(`hex afterPack: dock icon not replaced (dockPng=${fs.existsSync(dockPng)} ourPng=${fs.existsSync(ourPng)})`)
+    }
   }
 
   const updateYml = path.join(resources, 'app-update.yml')
