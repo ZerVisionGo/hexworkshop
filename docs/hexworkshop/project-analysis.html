@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Craft Agents（hexworkshop fork） - 项目源码分析报告</title>
+<style>
+  /* ===================== Theme Variables ===================== */
+  :root,
+  [data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-sidebar: #1e293b;
+    --bg-sidebar-hover: #334155;
+    --bg-card: #ffffff;
+    --text-primary: #1a1a2e;
+    --text-secondary: #64748b;
+    --text-sidebar: #cbd5e1;
+    --text-sidebar-active: #ffffff;
+    --text-sidebar-muted: #64748b;
+    --border-color: #e2e8f0;
+    --accent: #3b82f6;
+    --accent-light: #eff6ff;
+    --success: #10b981;
+    --success-bg: #ecfdf5;
+    --warning: #f59e0b;
+    --warning-bg: #fffbeb;
+    --danger: #ef4444;
+    --danger-bg: #fef2f2;
+    --info: #6366f1;
+    --info-bg: #eef2ff;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+    --radius: 8px;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --overlay-bg: rgba(0,0,0,0.4);
+  }
+
+  [data-theme="dark"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-sidebar: #0c1222;
+    --bg-sidebar-hover: #1e293b;
+    --bg-card: #1e293b;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-sidebar: #94a3b8;
+    --text-sidebar-active: #ffffff;
+    --text-sidebar-muted: #475569;
+    --border-color: #334155;
+    --accent-light: #1e293b;
+    --success-bg: #052e1633;
+    --warning-bg: #42200633;
+    --danger-bg: #3b080833;
+    --info-bg: #1e1b4b33;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.3);
+    --overlay-bg: rgba(0,0,0,0.6);
+  }
+
+  /* ===================== Reset & Base ===================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    display: flex;
+    min-height: 100vh;
+    transition: background 0.25s, color 0.25s;
+  }
+
+  /* ===================== Sidebar ===================== */
+  .sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 260px;
+    background: var(--bg-sidebar);
+    display: flex;
+    flex-direction: column;
+    z-index: 200;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-header {
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+
+  .sidebar-header h2 {
+    color: var(--text-sidebar-active);
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-header .subtitle {
+    color: var(--text-sidebar);
+    font-size: 12px;
+    opacity: 0.65;
+  }
+
+  /* Scrollable nav area */
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+
+  .sidebar-nav::-webkit-scrollbar { width: 4px; }
+  .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 12px;
+    color: var(--text-sidebar);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+
+  .nav-link:hover {
+    background: var(--bg-sidebar-hover);
+    color: var(--text-sidebar-active);
+  }
+
+  .nav-link.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .nav-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  /* ===================== Sidebar Footer ===================== */
+  .sidebar-footer {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .sidebar-meta {
+    font-size: 11.5px;
+    color: var(--text-sidebar-muted);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .sidebar-meta a {
+    color: var(--text-sidebar);
+    text-decoration: none;
+    opacity: 0.75;
+  }
+
+  .sidebar-meta a:hover { opacity: 1; text-decoration: underline; }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: var(--text-sidebar);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-family: var(--font-sans);
+  }
+
+  .theme-toggle:hover {
+    background: rgba(255,255,255,0.12);
+    color: var(--text-sidebar-active);
+  }
+
+  .theme-toggle .toggle-icon { font-size: 15px; }
+  .theme-toggle .toggle-label { flex: 1; text-align: left; }
+
+  /* ===================== Main Content ===================== */
+  .main-content {
+    margin-left: 260px;
+    flex: 1;
+    padding: 40px 48px;
+    max-width: 1100px;
+    min-width: 0;
+    transition: margin-left 0.3s;
+  }
+
+  /* ===================== Report Header ===================== */
+  .report-header {
+    margin-bottom: 40px;
+    padding-bottom: 28px;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .report-header h1 {
+    font-size: 30px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .report-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+  }
+
+  .report-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* ===================== Sections ===================== */
+  .section {
+    margin-bottom: 48px;
+    scroll-margin-top: 24px;
+  }
+
+  .section-title {
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title .icon { font-size: 19px; }
+
+  .subsection-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 22px 0 10px;
+    color: var(--text-primary);
+  }
+
+  p { margin-bottom: 12px; }
+
+  ul, ol { padding-left: 1.5em; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+
+  /* ===================== Cards ===================== */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+  }
+
+  .stat-card .stat-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .stat-card .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ===================== Tables ===================== */
+  .table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+
+  thead { background: var(--bg-secondary); }
+
+  th {
+    padding: 11px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: var(--accent-light); }
+
+  /* ===================== Badges ===================== */
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-high, .badge-danger   { background: var(--danger-bg);  color: var(--danger);  }
+  .badge-medium, .badge-warning { background: var(--warning-bg); color: var(--warning); }
+  .badge-low, .badge-success    { background: var(--success-bg); color: var(--success); }
+  .badge-info                   { background: var(--info-bg);    color: var(--info);    }
+
+  /* ===================== Code ===================== */
+  .code-block {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin-bottom: 14px;
+    white-space: pre;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .arch-diagram {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 14px 0;
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    text-align: center;
+  }
+
+  .dep-flow {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin: 14px 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre;
+  }
+
+  /* ===================== Mermaid Diagrams ===================== */
+  pre.mermaid {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin: 14px 0;
+    text-align: center;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  /* Once mermaid renders, the <pre> gets a <svg> child — let the SVG control sizing */
+  pre.mermaid[data-processed="true"] {
+    white-space: normal;
+    font-family: var(--font-sans);
+  }
+
+  pre.mermaid svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* ===================== Feature List ===================== */
+  .feature-list { list-style: none; padding: 0; }
+
+  .feature-list li {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .feature-list li:last-child { border-bottom: none; }
+
+  .feature-list .bullet {
+    color: var(--accent);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ===================== Module Cards ===================== */
+  .module-card {
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin-bottom: 14px;
+    background: var(--bg-card);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .module-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .module-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent-light);
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .module-card p {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+  }
+
+  .module-card p strong {
+    color: var(--text-primary);
+  }
+
+  /* ===================== Decision Items ===================== */
+  .decision-item {
+    border-left: 4px solid var(--info);
+    padding: 16px 20px;
+    margin-bottom: 14px;
+    background: var(--bg-card);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .decision-item-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .decision-number {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--info-bg);
+    color: var(--info);
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+  }
+
+  .decision-item p {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    margin-bottom: 0;
+    line-height: 1.6;
+  }
+
+  /* ===================== Unknown Items ===================== */
+  .unknown-item {
+    border-left: 4px solid var(--info);
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    background: var(--bg-card);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .unknown-item-title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+  }
+
+  .unknown-item-desc {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* ===================== Risk Items ===================== */
+  .risk-item {
+    border-left: 4px solid var(--border-color);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    background: var(--bg-card);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .risk-item.risk-high   { border-left-color: var(--danger); }
+  .risk-item.risk-medium { border-left-color: var(--warning); }
+  .risk-item.risk-low    { border-left-color: var(--success); }
+
+  .risk-item h4 {
+    font-size: 14.5px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .risk-item p {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+  }
+
+  /* ===================== Mobile overlay ===================== */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--overlay-bg);
+    z-index: 150;
+  }
+
+  /* ===================== Mobile menu button ===================== */
+  .mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 14px; left: 14px;
+    z-index: 300;
+    background: var(--bg-sidebar);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    width: 38px; height: 38px;
+    font-size: 18px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  /* ===================== Print ===================== */
+  @media print {
+    .sidebar, .mobile-menu-btn, .sidebar-overlay { display: none !important; }
+    .main-content { margin-left: 0; padding: 20px; }
+    .card, .table-wrapper { break-inside: avoid; }
+    body { background: white; color: black; }
+  }
+
+  /* ===================== Responsive ===================== */
+  @media (max-width: 768px) {
+    .sidebar {
+      transform: translateX(-100%);
+      box-shadow: none;
+    }
+
+    .sidebar.open {
+      transform: translateX(0);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .sidebar-overlay.visible { display: block; }
+
+    .main-content {
+      margin-left: 0;
+      padding: 20px 16px;
+    }
+
+    .mobile-menu-btn {
+      display: flex;
+    }
+
+    .report-header h1 { font-size: 22px; }
+    .card-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 480px) {
+    .card-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <!--
+    HTML Report Template for Source Code Analysis
+    ==============================================
+    Usage notes:
+    - Replace {{PLACEHOLDER}} values with real analysis data.
+    - Navigation sidebar items should match the sections in the report.
+    - Use CSS classes for consistent styling:
+        .badge-high / .badge-medium / .badge-low   — severity badges
+        .card / .card-grid / .stat-card             — content cards
+        .table-wrapper > table                      — data tables
+        .code-block / .arch-diagram / .dep-flow     — code / diagram blocks (ASCII fallback)
+        pre.mermaid                                 — Mermaid diagram blocks (auto-rendered as SVG)
+        .risk-item.risk-high/medium/low             — risk entries
+    - Mermaid diagrams: Use <pre class="mermaid"> for architecture and data flow diagrams.
+      Mermaid.js is loaded from CDN and auto-renders on page load with theme-aware styling.
+      If offline or CDN unavailable, the Mermaid source text is displayed as readable code.
+    - Dark/light mode is toggled manually via the button in the sidebar footer.
+      Theme toggle also re-renders Mermaid diagrams with the matching theme.
+    - The sidebar auto-closes on mobile after clicking a nav link.
+  -->
+
+  <!-- Mobile hamburger button -->
+  <button class="mobile-menu-btn" id="menuBtn" aria-label="Toggle navigation">&#9776;</button>
+
+  <!-- Mobile overlay (tap to close) -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+
+    <!-- Header -->
+    <div class="sidebar-header">
+      <h2>Craft Agents（hexworkshop fork）</h2>
+      <div class="subtitle">源码分析报告</div>
+    </div>
+
+    <!-- Nav links (scrollable) -->
+    <div class="sidebar-nav" id="sidebarNav">
+      <a class="nav-link active" href="#overview">
+        <span class="nav-icon">&#128203;</span> 项目概览
+      </a>
+      <a class="nav-link" href="#shape">
+        <span class="nav-icon">&#128450;</span> 仓库结构
+      </a>
+      <a class="nav-link" href="#tech-stack">
+        <span class="nav-icon">&#128736;</span> 技术栈
+      </a>
+      <a class="nav-link" href="#architecture">
+        <span class="nav-icon">&#127959;</span> 架构设计
+      </a>
+      <a class="nav-link" href="#modules">
+        <span class="nav-icon">&#127919;</span> 核心模块
+      </a>
+      <a class="nav-link" href="#decisions">
+        <span class="nav-icon">&#9889;</span> 独特设计决策
+      </a>
+      <a class="nav-link" href="#quality">
+        <span class="nav-icon">&#128737;</span> 质量信号与风险
+      </a>
+      <a class="nav-link" href="#unknowns">
+        <span class="nav-icon">&#10067;</span> 待验证的未知项
+      </a>
+    </div>
+
+    <!-- Footer: meta info + theme toggle -->
+    <div class="sidebar-footer">
+      <div class="sidebar-meta">
+        <div>2026-09-19</div>
+        <div style="margin-top:4px;">Generated by Repo Analyzer</div>
+      </div>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="toggle-icon" id="themeIcon">&#9790;</span>
+        <span class="toggle-label" id="themeLabel">切换暗色模式</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main-content">
+
+    <!-- Report Header -->
+    <header class="report-header">
+      <h1>Craft Agents（hexworkshop fork） 源码分析报告</h1>
+      <div class="report-meta">
+        <span class="report-meta-item">&#128197; 分析日期: 2026-09-19</span>
+        <span class="report-meta-item">&#128193; 路径: apps/hexworkshop</span>
+        <span class="report-meta-item">&#128296; 主要语言: TypeScript</span>
+        <span class="report-meta-item">&#128220; 协议: Apache-2.0</span>
+      </div>
+    </header>
+<section class="section" id="overview">
+<h2 class="section-title">Project Thesis</h2>
+<p><strong>Craft Agents 的本质是一个"文件系统即数据库"的多会话 agent 收件箱，所有可扩展的东西都是 <code>~/.craft-agent/</code> 下的文件夹，agent 自己会读写这些文件夹。</strong> 它不是一个"给 Claude 套壳的聊天窗"，而是把 Claude Agent SDK / pi 两个引擎藏在一个统一的 <code>AgentBackend</code> 接口后面，把 Skills、Sources、Automations、Pages、Statuses、Labels 全部定义为纯文件（<code>SKILL.md</code>、<code>config.json</code>、<code>automations.json</code>、<code>page.json</code>），并把这些文件的<strong>使用说明也当成文件</strong>打包进 app（<code>apps/electron/resources/docs/*.md</code>，每次启动同步到 <code>~/.craft-agent/docs/</code>），系统提示词里明确告诉模型"创建 X 之前先读 <code>docs/X.md</code>"。</p>
+<p>这带来一个对二开极其友好的后果：<strong>要给它加能力，第一选择永远是往文件夹里放文件，而不是改 TypeScript。</strong> 官方 README 里"告诉 agent 帮你导入 Claude Code skills"不是代码功能——源码里没有任何 <code>.claude/skills</code> 的引用（<code>git grep</code> 只命中 release notes），它就是 agent 读了 <code>docs/skills.md</code> 后自己 <code>cp</code> 文件。</p>
+<p>上游节奏：仅 2026-06 以来 15 个 tag、一周一 release；提交作者 84/106 是 <code>github-actions[bot]</code>——<strong>公开仓库是内部仓库的 OSS 导出镜像</strong>，PR 上游的流程要按 <code>CONTRIBUTING.md</code> 走但合并节奏由内部决定。</p>
+</section>
+<section class="section" id="shape">
+<h2 class="section-title">Repository Shape</h2>
+<p>Bun workspaces monorepo，<code>apps/*</code> 是可运行端，<code>packages/*</code> 是共享层。依赖方向严格是 <code>apps → server-core → shared → core</code>。</p>
+<div class="table-wrapper"><table><thead><tr><th>层</th><th>包</th><th>职责</th><th>文件数</th></tr></thead><tbody><tr><td>可运行端</td><td><code>apps/electron</code></td><td>桌面主界面（主进程 / preload / renderer），也是 bundled resources（docs、permissions、themes）的来源</td><td>910</td></tr>
+<tr><td></td><td><code>apps/cli</code></td><td><code>craft-cli</code>，WebSocket 瘦客户端，连 headless server</td><td>9</td></tr>
+<tr><td></td><td><code>apps/webui</code> <code>apps/viewer</code></td><td>Web 端与只读分享查看器</td><td>35</td></tr>
+<tr><td>服务层</td><td><code>packages/server-core</code></td><td><code>SessionManager</code>（9023 行，全系统的心脏）、RPC handlers、transport、automations 运行时、pages 执行</td><td>122</td></tr>
+<tr><td></td><td><code>packages/server</code></td><td>headless 入口：<code>bun run packages/server/src/index.ts</code>，<code>CRAFT_SERVER_TOKEN</code> 鉴权，可 TLS</td><td>4</td></tr>
+<tr><td>共享领域层</td><td><code>packages/shared</code></td><td>agent 后端（Claude / pi）、config、workspaces / projects / sessions / sources / skills / automations / pages / statuses / labels 的类型与存储</td><td>485</td></tr>
+<tr><td></td><td><code>packages/core</code></td><td>renderer 安全的纯类型（<code>Page</code>、<code>StoredMessage</code> 等）</td><td>15</td></tr>
+<tr><td>工具与旁路</td><td><code>packages/session-tools-core</code></td><td>会话内工具（<code>spawn_session</code>、<code>set_session_status</code>、<code>create_page</code>、<code>call_llm</code>…）</td><td>57</td></tr>
+<tr><td></td><td><code>packages/pi-agent-server</code></td><td>pi 引擎的子进程服务</td><td>38</td></tr>
+<tr><td></td><td><code>packages/messaging-gateway</code> <code>messaging-whatsapp-worker</code></td><td>Telegram / WhatsApp 网关</td><td>59</td></tr>
+<tr><td></td><td><code>packages/ui</code></td><td>共享 React 组件</td><td>180</td></tr></tbody></table></div>
+</section>
+<section class="section" id="tech-stack">
+<h2 class="section-title">Tech Stack</h2>
+<div class="table-wrapper"><table><thead><tr><th>类别</th><th>选型</th><th>为什么重要</th></tr></thead><tbody><tr><td>运行时 / 包管理</td><td>Bun（<code>bunfig.toml</code>、<code>bun.lock</code>）</td><td>脚本动作（automation <code>script</code> / page <code>refresh</code>）默认 runtime 也是 bun，且 Pages 的私有存储用 <code>bun:sqlite</code>——想用 Python 写刷新脚本可以（<code>python3</code> 在允许列表），但会失去 sqlite 工作区</td></tr>
+<tr><td>Agent 引擎 A</td><td><code>@anthropic-ai/claude-agent-sdk</code> 0.3.258</td><td>spawn 原生 <code>claude</code> 二进制（<code>claude-agent-sdk-binary</code> 别名），走 <code>CLAUDE_CODE_OAUTH_TOKEN</code> 或 <code>ANTHROPIC_API_KEY</code>；<code>plugins: []</code>——<strong>没有用 SDK 的 Skill/plugin 机制</strong>，skill 用"read-before-execute"自己实现</td></tr>
+<tr><td>Agent 引擎 B</td><td><code>@earendil-works/pi-ai</code> / <code>pi-agent-core</code> / <code>pi-coding-agent</code> 0.85.1</td><td>非 Anthropic provider（openai-codex、openrouter、google、ollama…）全走这里；跑在<strong>独立子进程</strong>（<code>pi-agent-server</code>），工具以 proxy 方式注册回主进程</td></tr>
+<tr><td>桌面</td><td>Electron + React 18 + Vite + Tailwind v4 + shadcn/Radix + Jotai + i18next</td><td><code>asar: false</code>；i18n 有 parity / sorted / coverage 三道 lint，改 UI 文案成本高</td></tr>
+<tr><td>定时</td><td><code>croner</code></td><td><code>SchedulerTick</code> 每分钟一次，5 字段 cron + IANA 时区</td></tr>
+<tr><td>数据校验</td><td><code>zod</code> ≥4、<code>gray-matter</code></td><td>SKILL.md frontmatter 用 gray-matter，只强制 <code>name</code> + <code>description</code>——<strong>与 Claude Code skill 格式兼容</strong></td></tr>
+<tr><td>MCP</td><td><code>@modelcontextprotocol/sdk</code></td><td>Sources 的 mcp 类型；API 类型 source 用 SDK 的 <code>createSdkMcpServer</code> 造一个进程内 <code>api_{name}</code> 工具</td></tr>
+<tr><td>打包</td><td>electron-builder，<code>publish.provider: generic</code> → <code>thecraftagents.com/electron/latest</code></td><td>自建包必须删 <code>app-update.yml</code>，否则被拉回官方版（详见 fork <code>AGENTS.md</code>）</td></tr></tbody></table></div>
+</section>
+<section class="section" id="architecture">
+<h2 class="section-title">Architecture Design</h2>
+<h3 class="subsection-title">4.1 模式</h3>
+<p><strong>模块化单体 + 每会话一个引擎子进程。</strong> 主进程（Electron main 或 headless <code>server</code>）持有 <code>SessionManager</code>；每个会话按 LLM connection 选驱动（<code>DRIVER_REGISTRY = { anthropic, pi }</code>，<code>packages/shared/src/agent/backend/factory.ts</code>），Claude 驱动 spawn <code>claude</code> 二进制，pi 驱动 spawn <code>pi-agent-server</code>。渲染端（Electron renderer / webui / cli）只是 RPC 客户端，<strong>同一套 server-core 同时服务桌面和 headless</strong>，这就是"桌面端可作瘦客户端连远程"的来源。</p>
+<h3 class="subsection-title">4.2 层次</h3>
+<pre class="mermaid">
+graph TD
+  subgraph Clients["客户端（只做 RPC）"]
+    EL[Electron renderer]
+    WEB[webui / viewer]
+    CLI[craft-cli]
+  end
+  subgraph Host["宿主进程（Electron main 或 packages/server）"]
+    SM[server-core SessionManager&lt;br/&gt;会话生命周期 / 自动化执行 / RPC handlers]
+    AUTO[shared/automations&lt;br/&gt;event-bus · cron-matcher · script-executor]
+    PAGES[shared/pages&lt;br/&gt;refresh · snapshot · action broker]
+    FAC[shared/agent/backend/factory&lt;br/&gt;DRIVER_REGISTRY]
+  end
+  subgraph Engines["每会话一个子进程"]
+    CL[ClaudeAgent → claude 二进制&lt;br/&gt;claude-agent-sdk]
+    PI[PiAgent → pi-agent-server&lt;br/&gt;pi-ai]
+  end
+  subgraph FS["~/.craft-agent/（唯一的持久化）"]
+    WS[workspaces/&amp;lt;slug&amp;gt;/&lt;br/&gt;config.json · automations.json · permissions.json]
+    SK[skills/ · sources/ · projects/ · pages/ · statuses/ · sessions/]
+    DOCS[docs/ · permissions/ · themes/&lt;br/&gt;每次启动从 app 资源覆盖]
+  end
+  EL &amp; WEB &amp; CLI --&gt;|WebSocket / IPC RPC| SM
+  SM --&gt; FAC --&gt; CL &amp; PI
+  SM --&gt; AUTO --&gt; SM
+  SM --&gt; PAGES
+  CL &amp; PI --&gt;|Read / Bash / MCP 工具| FS
+  SM --&gt; FS
+  DOCS -.-&gt;|系统提示词引用| CL &amp; PI
+</pre>
+<h3 class="subsection-title">4.3 执行流</h3>
+<ul>
+<li>开发：<code>bun run electron:dev</code>（热更新）/ <code>electron:start</code>。自动更新只在 <code>app.isPackaged</code> 时启用（<code>apps/electron/src/main/index.ts:1136</code>），开发模式无风险。</li>
+<li>headless：<code>CRAFT_SERVER_TOKEN=… bun run packages/server/src/index.ts</code>，或 <code>Dockerfile.server</code>；<code>scripts/install-server.sh</code> 生成 token。</li>
+<li>校验：<code>bun run validate:ci</code> = <code>typecheck:all</code> + <code>test:shared:all</code> + <code>test:doc-tools</code> + 三道 i18n lint。CI 只有这一条 job（<code>.github/workflows/validate.yml</code>）。</li>
+<li><code>docs/cli.md</code> 里的 clone 地址写的是 <code>anthropics/craft-agents</code>——文档比仓库迁移慢，不要照抄。</li>
+</ul>
+<h3 class="subsection-title">4.4 一次自动化触发的数据流（与本项目最相关）</h3>
+<pre class="mermaid">
+sequenceDiagram
+  participant Cron as SchedulerTick（每分钟）
+  participant AS as AutomationSystem
+  participant SM as SessionManager
+  participant Eng as 引擎子进程
+  participant FS as ~/.craft-agent + 工作目录
+  Cron-&gt;&gt;AS: tick
+  AS-&gt;&gt;AS: cron-matcher 匹配 automations.json 里的 matcher&lt;br/&gt;再过 conditions（time / state / and-or-not）
+  alt action.type == prompt
+    AS-&gt;&gt;SM: executePromptAutomation({prompt, labels, permissionMode, mentions})
+    SM-&gt;&gt;SM: createSession（name=automation 名，permissionMode 默认 safe，&lt;br/&gt;workingDirectory 落到 workspace defaults）
+    SM-&gt;&gt;Eng: 发送 prompt；@skill 被解析成 [skill:slug]
+    Eng-&gt;&gt;FS: 必须先 Read SKILL.md（PrerequisiteManager 拦截其它工具）
+    Eng-&gt;&gt;FS: 按 skill 指令读写工作目录
+    Eng--&gt;&gt;SM: 可调用 set_session_status / set_session_labels / create_page
+  else action.type == script
+    AS-&gt;&gt;AS: script-executor：argv 直接 spawn（无 shell），&lt;br/&gt;env 只有 CRAFT_*，路径必须在 workspace 内
+    AS-&gt;&gt;FS: 脚本写 pages/&lt;slug&gt;/data/snapshot.json
+  else action.type == webhook
+    AS-&gt;&gt;AS: HTTP 出站
+  end
+</pre>
+</section>
+<section class="section" id="modules">
+<h2 class="section-title">Core Modules</h2>
+<h3 class="subsection-title">5.1 Workspace 目录布局 <code>packages/shared/src/workspaces/</code>、<code>config/paths.ts</code></h3>
+<p><strong>所有状态都在 <code>~/.craft-agent/workspaces/&lt;slug&gt;/</code> 下，没有数据库。</strong> <code>CRAFT_CONFIG_DIR</code> 可整体改根目录（多实例开发用 <code>~/.craft-agent-1</code>）。</p>
+<div class="code-block"><pre>~/.craft-agent/
+  docs/  permissions/  themes/  tool-icons/  config-defaults.json   ← 每次启动从 app 覆盖，不要手改
+  workspaces/&lt;slug&gt;/
+    config.json          defaults.{model, permissionMode, workingDirectory, enabledSourceSlugs, thinkingLevel}
+    automations.json     { automations: { SchedulerTick: [...], LabelAdd: [...], ... } }
+    permissions.json     allowedBashPatterns / allowedMcpPatterns / allowedApiEndpoints / allowedWritePaths
+    .claude-plugin/plugin.json   由 ensurePluginManifest 自动生成
+    skills/&lt;slug&gt;/SKILL.md
+    sources/&lt;slug&gt;/{config.json, guide.md, permissions.json}
+    projects/&lt;slug&gt;/{config.json, assets/, MEMORY.md}
+    pages/&lt;slug&gt;/{page.json, index.html, data/{snapshot.json, store.sqlite}}
+    statuses/config.json
+    sessions/&lt;id&gt;/session.jsonl   首行 header，其后每行一条消息</pre></div>
+<p><strong>后果</strong>：workspace 目录可以整个 <code>git init</code> 版本化（sessions 除外）——发文工作流的 automations / skills / pages 配置可以放进 meta-repo 追踪，再软链到这里。</p>
+<h3 class="subsection-title">5.2 Skills <code>packages/shared/src/skills/</code>、<code>agent/base-agent.ts:916-1025</code></h3>
+<p><strong>三层目录、按 slug 覆盖、显式 @ 调用、读前禁用工具。</strong></p>
+<ul>
+<li>加载顺序（低→高）：<code>~/.agents/skills/</code> → <code>&lt;workspace&gt;/skills/</code> → <code>&lt;projectRoot&gt;/.agents/skills/</code>。注意是 <strong><code>.agents</code></strong> 不是 <code>.claude</code>（<code>storage.ts:31-36</code>）。projectRoot = 会话的 working directory。</li>
+<li>调用方式：用户或 automation prompt 里写 <code>@slug</code>，被解析为 <code>[skill:slug]</code>，<code>extractSkillPaths</code> 解出 <code>SKILL.md</code> 绝对路径塞进消息，<code>PrerequisiteManager.registerSkillPrerequisites</code> <strong>阻塞所有其它工具直到模型读过该文件</strong>（<code>base-agent.ts:1022-1025</code>）。</li>
+<li><strong>没有按 description 自动触发</strong>：系统提示词（<code>prompts/system.ts:659-671</code>）只讲"用户用 <code>[skill:slug]</code> 提到时怎么做"。Claude Code 里"1% 可能就自动用 skill"的行为在这里不存在——工作流每一步该用哪个 skill必须在 prompt 里点名。</li>
+<li>frontmatter 兼容 Claude Code；多出 <code>requiredSources</code>（调用时自动启用某些 source）、<code>alwaysAllow</code>（skill 激活时放行的工具）、<code>globs</code>。</li>
+<li>5 分钟缓存（<code>skillsCache</code>），新加 skill 后要等或触发 <code>invalidateSkillsCache</code>。</li>
+</ul>
+<p><strong>对发文工作流的直接结论</strong>：在 meta-repo 根目录做 <code>ln -s .claude/skills .agents/skills</code>，所有现有 skill（<code>content-deconstruct</code>、<code>xhs-precheck</code>、<code>zerspace-illustrations</code>、未来的 <code>wechat-publish</code>）就是 project 级 skill，零复制零源码改动。<code>~/.claude/plugins/</code> 里的 dbs-* 不在任何一层，需要软链进 <code>~/.agents/skills/</code> 或 workspace <code>skills/</code>。</p>
+<h3 class="subsection-title">5.3 Sources <code>packages/shared/src/sources/</code></h3>
+<p><strong>三种类型：<code>mcp</code>（http/sse/stdio）、<code>api</code>（一个通用 HTTP 工具）、<code>local</code>（本地路径提示）。</strong> 配置在 <code>sources/&lt;slug&gt;/config.json</code>，用法写在 <code>guide.md</code>，<strong>模型被要求先读 guide.md 再用工具</strong>（<code>pi-agent.ts:1419</code>，Claude 侧同样有 prerequisite）。</p>
+<p><code>api</code> 类型的实现是 <code>api-tools.ts:createApiTool</code>：为每个 source 造一个 <code>api_&lt;name&gt;</code> 工具，入参 <code>{path, method, params, _intent}</code>，自动注入鉴权（bearer / header / query / basic / oauth），支持 <code>_rawBody</code> 发非 JSON 体，<strong>不支持 multipart 文件上传</strong>（全文无 <code>FormData</code>）。有 <code>renewEndpoint</code> 机制但设计是"拿旧 token 换新 token"（<code>{{token}}</code> 占位），与微信"appid+secret 换 access_token"不匹配。</p>
+<p><strong>对发文工作流的直接结论</strong>：公众号 API 作为 <code>api</code> source 只适合<strong>只读 JSON 调用</strong>（查草稿列表、查素材）；<code>draft/add</code> 前必须先 <code>media/uploadimg</code> / <code>material/add_material</code> 上传封面，这是 multipart——<strong>推草稿必须走自己的 CLI（<code>mp-kit</code>）+ Bash 工具</strong>，不能靠 source。</p>
+<h3 class="subsection-title">5.4 Automations <code>packages/shared/src/automations/</code>、<code>server-core/.../SessionManager.ts:8475</code></h3>
+<p><strong>事件 × matcher × 动作，配置是一个 JSON 文件。</strong></p>
+<ul>
+<li>事件两类：App 事件（<code>LabelAdd/Remove</code>、<code>SessionStatusChange</code>、<code>FlagChange</code>、<code>PermissionModeChange</code>、<code>SchedulerTick</code>）和 Agent 事件（透传 SDK hooks：<code>PreToolUse</code>、<code>Stop</code>、<code>SessionEnd</code>…）。</li>
+<li>matcher：<code>cron</code>（仅 SchedulerTick）或 <code>matcher</code> 正则；<code>conditions</code> 支持 time（时段/星期/时区）、state（字段 value / from→to / contains）、and/or/not；<code>permissionMode</code>、<code>labels</code>、<code>enabled</code>、<code>telegramTopic</code>。</li>
+<li>三种动作：<br/>&nbsp;&nbsp;– <code>prompt</code>：<strong>新建一个会话</strong>发 prompt（<code>executePromptAutomation</code>）。可指定 <code>llmConnection</code>、<code>model</code>、<code>thinkingLevel</code>；<code>@skill</code> 会被解析。<strong>不能指定 workingDirectory / projectId</strong>——落到 workspace <code>defaults.workingDirectory</code>（<code>SessionManager.ts:1918, 2562</code>）。permissionMode 默认 <code>safe</code>（只读），要写文件必须在 matcher 上显式给 <code>ask</code> 或 <code>allow-all</code>。<br/>&nbsp;&nbsp;– <code>script</code>：spawn workspace 内脚本（bun/node/python3），无 shell、env 只含 <code>CRAFT_*</code>、同 matcher 不并发、超时 1s–15min。可绑定 <code>page</code> 刷新。<br/>&nbsp;&nbsp;– <code>webhook</code>：出站 HTTP。</li>
+<li>自带 <code>history-store</code>、<code>retry-scheduler</code>、<code>event-logger</code>。</li>
+</ul>
+<p><strong>对发文工作流的直接结论</strong>：</p>
+<ol>
+<li>一个 workspace 只能有一个默认 workingDirectory，所以<strong>发文 workspace 的 workingDirectory 就设为 meta-repo 根</strong>，所有 automation 会话天然在里面干活。</li>
+<li>可以用 <strong>label / status 做流水线状态机</strong>：给会话打 <code>ready-to-publish</code> 标签 → <code>LabelAdd</code> matcher 触发 <code>prompt: "@wechat-publish 处理本会话产出的文章"</code>；不需要写任何调度代码。</li>
+<li>数据回流用 <code>script</code> 动作 + Pages（见 5.5），不进 LLM。</li>
+</ol>
+<h3 class="subsection-title">5.5 Pages <code>packages/core/src/types/page.ts</code>、<code>shared/src/pages/</code></h3>
+<p><strong>agent 写的 HTML 小仪表盘，数据由定时脚本写盘，宿主在沙箱 iframe 渲染。</strong> <code>page.json</code> 里的 <code>refresh: {cron, script, runtime}</code> 会被物化成一个只含 <code>script</code> 动作的 cron matcher——<strong>从不为刷新起 agent 会话</strong>。脚本唯一的跨进程契约是 <code>data/snapshot.json</code>（<code>{kv, series}</code>），私有工作区 <code>store.sqlite</code>。页面里对 API source 的调用要经过 grant（按 path 正则授权、绑定内容摘要、有过期）。会话工具 <code>create_page</code> / <code>update_page</code> / <code>write_page_data</code> 让模型自己建页面。</p>
+<p><strong>对发文工作流的直接结论</strong>：公众号数据分析 = 一个 Page：刷新脚本读你导出的 xlsx（放在 workspace 内某目录），写 snapshot（每篇阅读/分享/完读率 series），<code>index.html</code> 画图。零 LLM 成本、零源码改动。</p>
+<h3 class="subsection-title">5.6 权限模型 <code>agent/mode-types.ts</code>、<code>agent/permissions-config.ts</code></h3>
+<p>三档：<code>safe</code>（UI 叫 Explore：Write/Edit/MultiEdit/NotebookEdit 硬编码禁用，Bash 只放行只读模式，MCP 只放行只读正则）/ <code>ask</code> / <code>allow-all</code>（Execute）。<strong>Claude 侧不用 SDK 的 <code>canUseTool</code>，全部在 <code>PreToolUse</code> hook 里判</strong>（<code>claude-agent.ts:1583-1588</code>），所以 pi 侧能复用同一套规则。可配置层级：app 默认（<code>~/.craft-agent/permissions/</code>，启动覆盖）&lt; workspace <code>permissions.json</code> &lt; source <code>permissions.json</code>；字段 <code>allowedBashPatterns</code>（带注释）、<code>allowedMcpPatterns</code>、<code>allowedApiEndpoints</code>（方法+路径级）、<code>allowedWritePaths</code>（Explore 模式下允许写的 glob）。</p>
+<p><strong>对发文工作流的直接结论</strong>：定时任务想在 <code>safe</code> 模式跑又要写 <code>topics.md</code>，把 <code>docs/content-ops/**</code> 加进 workspace <code>allowedWritePaths</code>；<code>mp-kit push</code> 加进 <code>allowedBashPatterns</code>——不用把整条流水线放到 <code>allow-all</code>。</p>
+<h3 class="subsection-title">5.7 SessionManager <code>packages/server-core/src/sessions/SessionManager.ts</code>（9023 行）</h3>
+<p><strong>唯一的 god object。</strong> 会话 CRUD、引擎创建、消息流、标题生成、自动化执行、分支、远程转移、Telegram 绑定、Kanban 任务都在这一个类里。上游自己也在往 <code>sessions/</code>、<code>tasks/</code> 子模块拆，但主体仍在。<strong>任何触碰会话生命周期的二开都会撞进这个文件</strong>，也是 merge 冲突概率最高的地方——这是"不改源码"原则最需要守住的位置。</p>
+</section>
+<section class="section" id="decisions">
+<h2 class="section-title">Distinctive Design Decisions</h2>
+<ol>
+<li><strong>文档即 API。</strong> 18 份 <code>resources/docs/*.md</code>（6447 行）每次启动覆盖到 <code>~/.craft-agent/docs/</code>，系统提示词的"Configuration Documentation"表告诉模型创建/修改 sources、automations、pages、skills 之前先读哪份。后果：<strong>新增一种"能力"可以只靠写一份 md</strong>，模型就会按它操作文件；也意味着上游改文档格式就等于改 API。</li>
+<li><strong>Skill 读前禁工具，而不是注入系统提示。</strong> 不用 SDK plugin，不把 SKILL.md 内容塞进 prompt；用 <code>PrerequisiteManager</code> 让模型自己 Read。后果：skill 体积不占系统提示词、两个引擎行为一致；代价是没有自动触发，且每次调用多一次工具往返。</li>
+<li><strong>两个引擎、一套工具契约。</strong> <code>session-tools-core</code> 定义约 30 个会话工具（<code>spawn_session</code>、<code>set_session_status</code>、<code>create_task</code>、<code>call_llm</code>、<code>browser_tool</code>…），Claude 侧作为 SDK MCP 工具注册，pi 侧作为 proxy 工具注册到子进程（<code>pi-agent.ts:584-627</code>），有 <code>session-tool-parity.test.ts</code> 保证两边一致。后果：换模型不换工作流；代价是 pi 侧的 MCP / API source 代理仍标 TODO（<code>pi-agent.ts:1454-1455</code>）——<strong>pi 引擎下 Sources 可能不可用</strong>，用 Codex 跑发文流水线前要验证。</li>
+<li><strong>Automation 的 prompt 动作 = 新会话，不是在旧会话续聊。</strong> 每次触发都是一张新卡片进收件箱，<code>triggeredBy</code> 标记，跳过 AI 起名。后果：流水线天然"一篇文章一张卡"，状态用 status/label 表达；代价是跨触发的上下文只能靠文件（<code>topics.md</code>、<code>MEMORY.md</code>）传递。</li>
+<li><strong>脚本动作零信任。</strong> argv spawn、只透传 <code>CRAFT_*</code> 环境变量、路径不得越出 workspace、同 matcher 串行。后果：<code>mp-kit</code> 如果以 script 动作跑，AppSecret 必须通过 <code>CRAFT_WH_*</code> 或 workspace 内文件传入，不能靠 shell profile 的普通变量。</li>
+<li><strong>Project 是 workspace 内的"上下文包"而非隔离边界。</strong> <code>projects/&lt;slug&gt;/</code> 只有 config + assets + MEMORY.md，会话可选绑定；Kanban 列每 project 可自定义。后果：一个 workspace（meta-repo）下可以按"公众号 / 小红书 / X"开多个 project 分别配 Kanban 列和 MEMORY.md，共享同一批 skills 和 sources。</li>
+<li><strong>OSS 仓库是导出镜像。</strong> commit 几乎全是 bot，一 tag 一 commit。后果：<code>git blame</code> 无信息，上游 PR 的评审在你看不见的地方发生，给上游提 PR 要有"可能被内部重写后以别的形式合入"的预期。</li>
+</ol>
+</section>
+<section class="section" id="quality">
+<h2 class="section-title">Quality Signals &amp; Risks</h2>
+<h3 class="subsection-title">测试</h3>
+<p>401 个测试文件，<code>packages/shared</code> 占 175，automations 子模块几乎每个文件配一个 <code>.test.ts</code>（cron-matcher、conditions、script-executor、security、sdk-bridge…）——<strong>恰好是本项目最依赖的部分测试最密</strong>。<code>SessionManager</code> 9023 行只有 server-core 下 36 个测试文件覆盖，UI 组件测试稀薄。</p>
+<h3 class="subsection-title">CI</h3>
+<p>单 job：<code>bun install --frozen-lockfile</code> + <code>bun run validate:ci</code>（typecheck 全包 + shared 关键测试 + Python 文档工具 smoke + i18n 三道 lint）。没有 e2e，没有 electron 打包验证。</p>
+<h3 class="subsection-title">文档</h3>
+<p>对 agent 的文档远好于对开发者的文档：<code>resources/docs/</code> 6447 行 vs 根目录 <code>docs/</code> 只有一份 <code>cli.md</code>（且 clone 地址过期）。<code>apps/electron/CLAUDE.md</code> 是最好的开发者入门材料。</p>
+<h3 class="subsection-title">卫生</h3>
+<p>TODO/FIXME 仅 19 处（对 1964 文件而言极少），说明内部有另一套 issue 跟踪。超大文件：<code>SessionManager.ts</code> 9023、<code>AppShell.tsx</code> 3932、<code>browser-pane-manager.ts</code> 3613、<code>claude-agent.ts</code> 3175、<code>pi-agent.ts</code> 2719。</p>
+<h3 class="subsection-title">风险表</h3>
+<div class="table-wrapper"><table><thead><tr><th>风险</th><th>严重度</th><th>证据</th><th>对本项目的影响 / 对策</th></tr></thead><tbody><tr><td>Claude 订阅 OAuth 经第三方 SDK 使用的计费与政策口径</td><td>高</td><td><code>apps/electron/CLAUDE.md</code> §2 直接设置 <code>CLAUDE_CODE_OAUTH_TOKEN</code></td><td>以实际账单为准；备选 API key 或 Codex OAuth</td></tr>
+<tr><td>pi 引擎下 MCP / API source 代理未完成</td><td>中</td><td><code>pi-agent.ts:1454-1455</code> 标 TODO</td><td>发文流水线先只在 Claude connection 上验证；Codex 只跑纯文件操作</td></tr>
+<tr><td>一周一 release、SessionManager 巨型文件</td><td>中</td><td>git tag 节奏；9023 行</td><td>严守"不改源码"，冲突面≈0</td></tr>
+<tr><td>自动更新覆盖自建包</td><td>中</td><td><code>electron-builder.yml</code> <code>publish.provider: generic</code></td><td>打包后删 <code>app-update.yml</code>（已写进 fork AGENTS.md）</td></tr>
+<tr><td>Skills 5 分钟缓存 + 无自动触发</td><td>低</td><td><code>storage.ts</code> skillsCache；<code>system.ts:659</code></td><td>prompt 里显式 <code>@skill</code>；新加 skill 后重开会话</td></tr>
+<tr><td><code>api</code> source 无 multipart</td><td>低</td><td><code>api-tools.ts</code> 全文无 FormData</td><td>推草稿走 CLI</td></tr>
+<tr><td>自动化 prompt 会话不能指定 workingDirectory</td><td>低</td><td><code>executePromptAutomation</code> 参数表</td><td>workspace 默认目录设为 meta-repo 根</td></tr>
+<tr><td>文档与仓库漂移（<code>docs/cli.md</code> 指向 <code>anthropics/craft-agents</code>）</td><td>低</td><td><code>docs/cli.md:16</code></td><td>以源码为准</td></tr></tbody></table></div>
+<h3 class="subsection-title">商业与复用</h3>
+<p>Apache-2.0：可商用、可闭源衍生、可再分发，需保留 <code>LICENSE</code> / <code>NOTICE</code>，含专利授权。<strong>商标另有限制</strong>（<code>TRADEMARK.md</code>）：fork 不得使用 "Craft" / "Craft Agents" 名称与 logo，只能说 "Fork of Craft Agents"——本仓库叫 hexworkshop 正是为此；对外分发安装包前需改 <code>productName</code> / <code>appId</code> / 图标。</p>
+</section>
+<section class="section" id="unknowns">
+<h2 class="section-title">Unknowns Worth Verifying</h2>
+<ol>
+<li><strong>pi（Codex）引擎能否使用 project 级 skill 与 Bash 工具完成一次完整发文</strong>——静态看 skill 解析在 <code>BaseAgent</code> 共享层，应当可以；MCP/API source 代理是 TODO，需实跑。</li>
+<li><strong><code>safe</code> 模式 + <code>allowedWritePaths</code> 是否对 Claude 引擎的 Write 工具生效</strong>，还是仅放行 Bash 写入——<code>MergedPermissionsConfig.blockedTools</code> 说 Write 类硬编码禁用，<code>allowedWritePaths</code> 的实际语义要看 <code>PreToolUse</code> 判定代码。</li>
+<li><strong><code>LabelAdd</code> matcher 的正则匹配的是 label id 还是显示名</strong>，以及 <code>state</code> 条件里 <code>labels</code> 字段的 <code>contains</code> 语义——决定"打标签触发发布"的配置写法。</li>
+<li>**Pages 刷新脚本用 <code>python3</code> runtime 时 <code>CRAFT_PAGE_*</code> 环境变量与 snapshot 写入约定**是否与 bun 一致——影响 xlsx 解析用 openpyxl 还是 bun 的 xlsx 库。</li>
+<li><strong>Claude Pro/Max OAuth 在本 app 内的实际用量归属</strong>（订阅额度 vs extra usage）。</li>
+<li><strong>workspace 目录纳入 git 后，<code>sessions/</code> 与 <code>.claude-plugin/</code> 的排除是否足够</strong>，<code>config.json</code> 里是否有机器相关绝对路径导致跨机不可移植。</li>
+</ol>
+</section>
+<section class="section" id="appendix">
+<h2 class="section-title">附：对"公众号发文工作流"的落位建议（由以上分析直接推出）</h2>
+<div class="table-wrapper"><table><thead><tr><th>流水线环节</th><th>用什么扩展点</th><th>改源码？</th></tr></thead><tbody><tr><td>选题（从 <code>topics.md</code> 挑）</td><td><code>SchedulerTick</code> cron → <code>prompt</code> 动作 <code>@wechat-publish pick</code>，会话在 meta-repo 根</td><td>否</td></tr>
+<tr><td>正文（人写）</td><td>会话即卡片；Kanban 列：待写 / 写作中 / 待检 / 待发 / 已发</td><td>否</td></tr>
+<tr><td>检查（AI 味、风险、标题摘要）</td><td><code>wechat-publish</code> skill 内点名 <code>@dbs-ai-check</code> <code>@dbs-content-risk-check</code>（软链进 <code>~/.agents/skills/</code>）</td><td>否</td></tr>
+<tr><td>排版 + 封面</td><td>同一 skill 调 <code>@dbs-wechat-html</code> <code>@zerspace-illustrations</code></td><td>否</td></tr>
+<tr><td>推草稿箱</td><td><code>LabelAdd: ready-to-publish</code> → <code>prompt</code> 动作 → skill 执行 <code>mp-kit push</code>（Bash，放进 <code>allowedBashPatterns</code>）</td><td>否</td></tr>
+<tr><td>数据回流</td><td>Page <code>wechat-stats</code>：cron <code>script</code> 读 xlsx 写 snapshot</td><td>否</td></tr>
+<tr><td>远程固定 IP（白名单）</td><td>headless server 跑在 VPS，桌面端连 <code>wss://</code></td><td>否</td></tr></tbody></table></div>
+<p>需要写的新东西只有两件：<code>wechat-publish</code> 的 <code>SKILL.md</code>（放 meta-repo <code>.claude/skills/</code>，经软链被识别）和 <code>tools/mp-kit</code> CLI。</p>
+</section>
+
+  </main>
+
+  <script>
+    /* ===================== Theme Toggle ===================== */
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeLabel = document.getElementById('themeLabel');
+
+    function applyTheme(theme) {
+      html.setAttribute('data-theme', theme);
+      if (theme === 'dark') {
+        themeIcon.textContent = '\u2600'; // ☀
+        themeLabel.textContent = '切换亮色模式';
+      } else {
+        themeIcon.textContent = '\u263D'; // ☽
+        themeLabel.textContent = '切换暗色模式';
+      }
+      try { localStorage.setItem('theme', theme); } catch(e) {}
+    }
+
+    // Restore saved preference, otherwise use system preference
+    (function() {
+      let saved;
+      try { saved = localStorage.getItem('theme'); } catch(e) {}
+      if (saved === 'dark' || saved === 'light') {
+        applyTheme(saved);
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        applyTheme('dark');
+      } else {
+        applyTheme('light');
+      }
+    })();
+
+    themeToggle.addEventListener('click', () => {
+      applyTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+
+    /* ===================== Mobile Sidebar ===================== */
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const menuBtn = document.getElementById('menuBtn');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      overlay.classList.add('visible');
+      menuBtn.innerHTML = '&#10005;'; // ✕
+    }
+
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('visible');
+      menuBtn.innerHTML = '&#9776;'; // ☰
+    }
+
+    menuBtn.addEventListener('click', () => {
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+
+    overlay.addEventListener('click', closeSidebar);
+
+    // Close sidebar on nav link click (mobile)
+    document.getElementById('sidebarNav').addEventListener('click', (e) => {
+      if (e.target.closest('.nav-link') && window.innerWidth <= 768) {
+        closeSidebar();
+      }
+    });
+
+    /* ===================== Active Nav Highlight on Scroll ===================== */
+    const sections = document.querySelectorAll('.section');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(l => l.classList.remove('active'));
+          const id = entry.target.getAttribute('id');
+          const active = document.querySelector(`.nav-link[href="#${id}"]`);
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px' });
+
+    sections.forEach(s => observer.observe(s));
+
+    /* ===================== Mermaid.js Integration ===================== */
+    // Store original Mermaid source for re-rendering on theme change
+    const mermaidBlocks = document.querySelectorAll('pre.mermaid');
+    const mermaidSources = [];
+    mermaidBlocks.forEach((block, i) => {
+      mermaidSources.push(block.textContent.trim());
+      block.setAttribute('data-mermaid-index', i);
+    });
+
+    function getMermaidTheme() {
+      return html.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+    }
+
+    function initMermaid() {
+      if (typeof mermaid === 'undefined') return;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: getMermaidTheme(),
+        securityLevel: 'loose',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif',
+      });
+      renderMermaidDiagrams();
+    }
+
+    async function renderMermaidDiagrams() {
+      if (typeof mermaid === 'undefined') return;
+      for (let i = 0; i < mermaidBlocks.length; i++) {
+        const block = mermaidBlocks[i];
+        const source = mermaidSources[i];
+        try {
+          const id = 'mermaid-diagram-' + i;
+          const { svg } = await mermaid.render(id, source);
+          block.innerHTML = svg;
+          block.setAttribute('data-processed', 'true');
+        } catch (e) {
+          // On render failure, show the source code as fallback
+          block.textContent = source;
+          block.removeAttribute('data-processed');
+          console.warn('Mermaid render failed for block ' + i + ':', e);
+        }
+      }
+    }
+
+    // Re-render Mermaid diagrams when theme changes
+    const _originalApplyTheme = applyTheme;
+    applyTheme = function(theme) {
+      _originalApplyTheme(theme);
+      if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: theme === 'dark' ? 'dark' : 'default',
+          securityLevel: 'loose',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif',
+        });
+        renderMermaidDiagrams();
+      }
+    };
+
+    // Load Mermaid from CDN (keeps the HTML file self-contained as a single file)
+    (function() {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+      script.onload = initMermaid;
+      script.onerror = function() {
+        // CDN unavailable — diagrams stay as readable source text (graceful fallback)
+        console.warn('Mermaid CDN unavailable. Diagrams will display as source text.');
+      };
+      document.head.appendChild(script);
+    })();
+  </script>
+</body>
+</html>

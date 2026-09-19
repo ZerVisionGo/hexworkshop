@@ -126,8 +126,12 @@ scripts/           构建脚本（electron-build-*.ts、build-server.ts）
 
 ## 主要功能模块（与 meta-repo 的接法）
 
-- **Workspace** 指向 meta-repo 根目录 `../../`，让 agent 读到根 `AGENTS.md` / `CLAUDE.md`
-- **Skills** 从 `../../.claude/skills/` 导入；`~/.claude/plugins/` 里的 marketplace skill（dbs-* 等）需手动拷贝或软链
-- **Sources** 至少挂 `../../docs/content-ops/`（选题库、草稿）和 `../../apps/rainnut-blog/content/`
-- **Automations** 承接原设计里的定时任务（选题提醒、数据回流）
+源码分析报告：`docs/hexworkshop/project-analysis.md`（扩展点、落盘位置、权限模型、与发文工作流的对应）。要点：
+
+- **一切扩展都是 `~/.craft-agent/workspaces/<slug>/` 下的文件**（`config.json` / `automations.json` / `permissions.json` / `skills/` / `sources/` / `projects/` / `pages/`），没有数据库。先放文件，再考虑改源码
+- **Workspace** 的 `defaults.workingDirectory` 设为 meta-repo 根 `../../`：自动化起的会话只能落到这个目录，也只有这样 agent 才读得到根 `AGENTS.md` / `CLAUDE.md`
+- **Skills** 三层：`~/.agents/skills/` < workspace `skills/` < `<workingDirectory>/.agents/skills/`。**是 `.agents` 不是 `.claude`**，源码里没有任何 `.claude/skills` 导入逻辑。在 meta-repo 根 `ln -s .claude/skills .agents/skills` 即可全部识别；`~/.claude/plugins/` 里的 dbs-* 需软链进 `~/.agents/skills/`。Skill **不会按描述自动触发**，prompt 里必须 `@slug` 点名；读过 `SKILL.md` 之前其它工具被拦
+- **Sources** 的 `api` 类型不支持 multipart，公众号推草稿（要传封面图）走 `tools/mp-kit` CLI + Bash，不做成 source
+- **Automations**：`prompt` 动作 = 新建会话（默认 `safe` 只读，要写文件需在 matcher 上给 `ask`/`allow-all`，或在 workspace `permissions.json` 的 `allowedWritePaths` 放行）；`script` 动作只透传 `CRAFT_*` 环境变量、路径须在 workspace 内。流水线状态用 label / status 表达，`LabelAdd` / `SessionStatusChange` 可触发下一步
+- **Pages** = 定时脚本写 `data/snapshot.json` + 自带 `index.html`，从不起 agent 会话——数据回流仪表盘用它
 - 公众号发文流水线的 skill + CLI 是壳无关的，设计在 meta-repo 侧，工坊只负责调用
