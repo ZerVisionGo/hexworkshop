@@ -28,3 +28,53 @@
 | H 能力管理 | Skills / Sources 按 workspace 管理 | — |
 
 原设计文档：[2026-09-16-hexworkshop-design.md](2026-09-16-hexworkshop-design.md)（保留作需求清单）。
+
+## 安装、迁移与更新（自建 Hex Workshop.app）
+
+自建包与官方 Craft Agents **完全隔离、可同时运行**：不同的 bundle id、`~/Library/Application Support/Hex Workshop/`、配置目录 `~/.hexworkshop/`（通过 Info.plist 的 `LSEnvironment` 烤入，双击启动也生效）。脚本都在 `scripts/hex/`，上游文件一个不改。
+
+### 首次
+
+```bash
+cd apps/hexworkshop
+bun install
+bash scripts/hex/package-mac.sh --stage --install    # --stage 暂存 bun / Claude SDK 二进制（只需一次）；--install 装到 /Applications，会确认
+```
+
+第一次打开是全新状态。把官方版里已配好的东西搬过来（一次性）：
+
+```bash
+cp ~/.craft-agent/credentials.enc ~/.hexworkshop/                 # 凭据按机器 UUID 加密，同机可直接复用，不用重新登录
+cp -R ~/.craft-agent/workspaces/<slug> ~/.hexworkshop/workspaces/  # workspace（skills / sources / automations / sessions）
+```
+
+然后在 Hex Workshop 里 设置 → 工作区 → 添加已有目录，选 `~/.hexworkshop/workspaces/<slug>`；LLM 连接重新登一次或从 `~/.craft-agent/config.json` 的 `llmConnections` 手动合并。之后两边数据各自演化，这是"互不影响"的代价。
+
+### 日常更新
+
+```bash
+bash scripts/hex/update.sh            # 同步上游 → 合进 zer/main → typecheck → 打包 → 替换 /Applications（免确认）
+bash scripts/hex/update.sh --no-sync  # 只改了本地源码：不碰 git，直接重新打包安装
+```
+
+- 合并上游有冲突时脚本会停下并保留冲突现场，解决后 `git add -A && git commit`，再 `update.sh --no-sync`
+- `bun.lock` / `package.json` 变了会自动 `bun install` 并加 `--stage`
+- 安装时会退出正在运行的 Hex Workshop，旧版本备份到 `~/Applications/`（只留最近 2 个）
+- 脚本**不会 push**；确认新包正常后手动 `git push origin main zer/main`
+
+### 单独打包（不安装）
+
+```bash
+bash scripts/hex/package-mac.sh              # 产物在 apps/electron/release/mac-arm64/Hex Workshop.app
+bash scripts/hex/package-mac.sh --vanilla    # 与官方同名的 Craft Agents.app（不能与官方共存，仅调试用）
+```
+
+### 图标
+
+`resources/hex/icon-1024.png` 由 `scripts/hex/make-icon.swift` 生成（Craft 同款白→浅灰圆角底板 + 灰蓝像素 "HEX" 字样），`icon.icns` 由它导出。改颜色：`swift scripts/hex/make-icon.swift resources/hex/icon-1024.png 5C7C9B`，再重跑 `iconutil`（见 `package-mac.sh` 注释）。Dock 图标在运行时由主进程从 `dist/resources/icon.png` 设置，`scripts/hex/afterPack.cjs` 会把 bundle 里这张也替换掉。
+
+### 排错
+
+- 上游改了签名或 SDK 版本导致包起不来：`bash scripts/hex/package-mac.sh --stage --install`
+- 自动更新日志里的 `ENOENT app-update.yml` 是预期的（我们故意删了更新清单）
+- Dock 图标还是旧的：`killall Dock`

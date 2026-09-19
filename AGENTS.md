@@ -81,8 +81,9 @@ bun run lint
 # 本机打包成「Hex Workshop.app」（与官方 app 完全隔离、可同时运行；不公证）
 bash scripts/hex/package-mac.sh --stage      # 首次 / bun install 后 / 同步上游后（暂存 bun、Claude SDK 二进制）
 bash scripts/hex/package-mac.sh              # 日常重新打包
-bash scripts/hex/package-mac.sh --install    # 安装到 /Applications（会确认）
-# 改名版细节：productName/appId=Hex Workshop/com.zervisiongo.hexworkshop，配置目录 ~/.hexworkshop
+bash scripts/hex/package-mac.sh --install    # 安装到 /Applications（会确认；--yes 免确认）
+bash scripts/hex/update.sh                    # 同步上游 + typecheck + 打包 + 安装，一条命令（--no-sync 只重打本地）
+# 详细步骤（首次安装、数据迁移、排错）见 docs/hexworkshop/README.md。改名版细节：productName/appId=Hex Workshop/com.zervisiongo.hexworkshop，配置目录 ~/.hexworkshop
 # （LSEnvironment 烤入，依赖 fix/config-dir 补丁），图标 resources/hex/icon.icns，
 # app-update.yml 由 scripts/hex/afterPack.cjs 在签名前删除。首次使用把官方数据拷过来：
 #   cp ~/.craft-agent/{config.json,credentials.enc} ~/.hexworkshop/ && cp -R ~/.craft-agent/workspaces/<slug> ~/.hexworkshop/workspaces/

@@ -5,7 +5,7 @@
 #   bash scripts/hex/package-mac.sh --stage      # 首次 / bun install 后 / 同步上游后：先跑上游 build-dmg.sh
 #                                                #   暂存 bun 二进制、Claude SDK 原生二进制、ripgrep（只需一次）
 #   bash scripts/hex/package-mac.sh              # 日常：只重新构建 + 打包（快）
-#   bash scripts/hex/package-mac.sh --install    # 打包后安装到 /Applications（会先确认）
+#   bash scripts/hex/package-mac.sh --install    # 打包后安装到 /Applications（会先确认；加 --yes 免确认）
 #   bash scripts/hex/package-mac.sh --vanilla    # 不改名，打成与官方同名的 Craft Agents.app（不能与官方共存）
 #   可组合：--stage --install
 #
@@ -15,7 +15,7 @@
 #   CRAFT_CONFIG_DIR       $HOME/.hexworkshop（通过 Info.plist 的 LSEnvironment 烤入，Finder 启动也生效）
 #                          → 独立的 workspaces / sessions / credentials / logs（依赖 fix/config-dir 补丁）
 #   CRAFT_DEEPLINK_SCHEME  hexworkshop://
-#   图标                   resources/hex/icon.icns（雨果 EVA 头像）
+#   图标                   resources/hex/icon.icns（HEX 像素字样，由 scripts/hex/make-icon.swift 生成）
 #   首次使用需把官方的 workspace 拷过来：cp -R ~/.craft-agent/workspaces/<slug> ~/.hexworkshop/workspaces/
 #
 # 关键点：
@@ -30,12 +30,13 @@ ARCH="${ARCH:-arm64}"
 ELECTRON_DIR="$ROOT_DIR/apps/electron"
 BACKUP_DIR="$HOME/Applications"
 
-DO_STAGE=0; DO_INSTALL=0; VANILLA=0
+DO_STAGE=0; DO_INSTALL=0; VANILLA=0; ASSUME_YES=0
 for a in "$@"; do
   case "$a" in
     --stage) DO_STAGE=1 ;;
     --install) DO_INSTALL=1 ;;
     --vanilla) VANILLA=1 ;;
+    --yes|-y) ASSUME_YES=1 ;;
     *) echo "未知参数：$a" >&2; exit 2 ;;
   esac
 done
@@ -80,7 +81,7 @@ rm -rf "$ELECTRON_DIR/release/mac-$ARCH"
 ( cd "$ELECTRON_DIR" && npx electron-builder --mac "--$ARCH" \
     --config electron-builder.yml \
     -c.afterPack="$ROOT_DIR/scripts/hex/afterPack.cjs" \
-    "${BRAND_ARGS[@]}" )
+    ${BRAND_ARGS[@]+"${BRAND_ARGS[@]}"} )
 
 [ -d "$BUILT_APP" ] || { echo "未找到构建产物：$BUILT_APP" >&2; exit 1; }
 [ ! -e "$BUILT_APP/Contents/Resources/app-update.yml" ] || { echo "app-update.yml 仍然存在，afterPack 未生效" >&2; exit 1; }
@@ -115,8 +116,12 @@ if [ -d "$TARGET_APP" ]; then
 else
   echo "将安装到 $TARGET_APP"
 fi
-read -r -p "继续？[y/N] " ans
-[[ "$ans" == [yY] ]] || { echo "已取消"; exit 0; }
+if [ "$ASSUME_YES" -eq 1 ]; then
+  echo "（--yes）继续"
+else
+  read -r -p "继续？[y/N] " ans
+  [[ "$ans" == [yY] ]] || { echo "已取消"; exit 0; }
+fi
 
 if pgrep -f "$TARGET_APP/Contents/MacOS/" >/dev/null; then
   echo "退出正在运行的 ${APP_NAME}…"
@@ -129,6 +134,8 @@ if [ -d "$TARGET_APP" ]; then
   BACKUP="$BACKUP_DIR/$APP_NAME (backup $(date +%Y%m%d-%H%M)).app"
   mv "$TARGET_APP" "$BACKUP"
   echo "旧版本已移至：$BACKUP"
+  # 只保留最近 2 个备份
+  ls -1dt "$BACKUP_DIR/$APP_NAME (backup "*.app 2>/dev/null | tail -n +3 | while IFS= read -r old; do rm -rf "$old"; echo "清理旧备份：$old"; done
 fi
 
 cp -R "$BUILT_APP" "$TARGET_APP"
