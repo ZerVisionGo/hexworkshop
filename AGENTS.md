@@ -16,7 +16,9 @@
 | `zer/main` | 二开长期分支，GitHub 默认分支 | 所有二开在这里；同步上游用 **merge**，不 rebase，不 force push |
 | `fix/*` `feature/*` | 给上游的 PR | **从 `upstream/main` 切**，不从 `zer/main` 切；PR 合并后随下一次同步自然回到 `zer/main` |
 
-bug 修复走 `fix/*` → 上游 PR。**不要把修复直接合进 `zer/main`**——留在自己这边就是永久冲突源。上游迟迟不合、又急用时，才 cherry-pick 到 `zer/main` 并在 commit message 注明 `cherry-pick of upstream PR #n`，合并后删掉。
+bug 修复走 `fix/*` → 上游 PR。**先 issue 还是直接 PR，按改动大小定**：单文件、自证的小修（错别字、文档与代码明显不一致）直接 PR，PR 本身就是最好的 bug report；**跨多个文件、碰存储位置或运行时行为、涉及设计取舍的，先按上游 Bug Report 模板开 issue**（版本 / 系统 / 复现 / 期望 / 实际），PR 正文首行 `Fixes #<n>`。上游 `CONTRIBUTING.md` 没有强制，但这样维护者能先对方向表态，不至于写完被拒。
+
+**不要把修复直接合进 `zer/main`**——留在自己这边就是永久冲突源。上游迟迟不合、又急用时，才 cherry-pick 到 `zer/main` 并在 commit message 注明 `cherry-pick of upstream PR #n`，合并后删掉。
 
 ### 改动优先级
 
