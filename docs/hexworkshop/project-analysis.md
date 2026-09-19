@@ -259,3 +259,30 @@ Apache-2.0：可商用、可闭源衍生、可再分发，需保留 `LICENSE` / 
 | 远程固定 IP（白名单） | headless server 跑在 VPS，桌面端连 `wss://` | 否 |
 
 需要写的新东西只有两件：`wechat-publish` 的 `SKILL.md`（放 meta-repo `.claude/skills/`，经软链被识别）和 `tools/mp-kit` CLI。
+
+## 附二：官方文档（thecraftagents.com/docs）对照与补充（2026-09-19）
+
+读了 introduction / skills / browser / api-discovery / rich-output / automations / permissions / working-directory / kanban / tasks / labels auto-rules / server headless / environment-variables。**文档整体落后源码半个版本**，以下按"文档说 / 源码是"记录：
+
+| 主题 | 文档说 | 源码（v0.13.3）是 | 采信 |
+|---|---|---|---|
+| Skill 目录层级 | 两层：workspace + 内置 | 三层：`~/.agents/skills/` < workspace < `<cwd>/.agents/skills/`（Issue #171） | 源码 |
+| Skill `globs` 自动激活 | "匹配文件模式时自动激活" | `globs` 只被解析进 `SkillMetadata`，运行时**没有任何引用** | 源码：不存在自动激活 |
+| 上下文文件 | 只提 CLAUDE.md "自动注入" | `CONTEXT_FILE_PATTERNS = ['agents.md','claude.md']`，大小写不敏感、递归发现（monorepo），**列在系统提示词里让模型自己 Read**（为了压缩后仍在） | 源码：AGENTS.md 一等公民 |
+| Automation 动作 | `command`（shell）+ `prompt`；`"version": 2` | `prompt` + `webhook` + `script`（argv spawn，**无 shell**）；`version` 可选 | 源码 |
+| `allowedWritePaths` | Explore 模式下允许写入匹配 glob 的文件 | 类型里有，判定逻辑未读 | 文档（解决了"未知项 2"，仍需实跑） |
+| Explore 模式 Bash | 安全命令也**禁止** `&&` `\|\|` `;` `\|` `>` `$()` | — | 影响 `mp-kit push` 的写法：单命令、无管道 |
+| 环境变量 | 无 `CRAFT_WH_*` | 内置 `docs/automations.md` 有 `CRAFT_WH_*`（webhook 密钥透传） | 源码/内置文档 |
+
+### 文档带来的新发现
+
+1. **Tasks = 真正的流水线原语**（`<workspace>/tasks/<slug>/task.yaml`，`packages/shared/src/tasks/schema.ts`）。一个 DAG：`nodes[]` 每个节点是一个子会话，`depends_on` 传递上游 `${nodes.<id>.output}`；顶层有 **`params[]`（string/number/boolean/enum/json/text，带 default/enum）→ `${params.<name>}`**、`cwd`、`skills[]`（子会话 prompt 自动带 `[skill:slug]`）、`sources[]`、`defaults.permissionMode`；节点级 `permissionMode` / `labels` / `status` / `retry` / `timeout`；`acceptance_criteria` 由 orchestrator 打分，FAIL 进 repair loop（默认 3 次）；每次运行落 `tasks/<slug>/runs/<runId>/`。**这就是 Hex Workshop 原设计里"frontmatter 表单 + prompt 模板 + runs/ 记录"的完整对应物**，且多了验收与重试。`approval` / `route` / `loop` 等控制流字段"解析但未执行"（P4）。
+2. **浏览器工具共享你已登录的本机浏览器 cookie，远程 workspace 也是驱动本地浏览器**。"API discovery"模式：agent 观察页面网络请求 → 识别内部 JSON API → 在页面上下文 `fetch(..., {credentials:'include'})` 并行拉取。对公众号后台（mp.weixin.qq.com 登录态）意味着**数据回流可以不导 xlsx**，但登录态会过期、页面 API 无契约——留作 v2 选项，v1 仍用 xlsx + Pages。
+3. **Rich output**：HTML preview（沙箱 iframe）、data table、spreadsheet（可导 xlsx/csv）、image / PDF / markdown 预览。`dbs-wechat-html` 的产物可以直接在会话里预览，封面图直接内嵌。
+4. **Labels auto-rules**：`labels/config.json` 里给标签配正则，用户消息命中即自动打标（只扫用户消息，不扫 agent 输出）。可用来把"发 #05"这类口令变成 `LabelAdd` 事件触发自动化。
+5. **Headless**：官方镜像 `ghcr.io/lukilabs/craft-agents-server`，`CRAFT_RPC_HOST=0.0.0.0` + TLS 必需；Web UI 同端口 9100。
+
+### 对发文工作流落位的修正
+
+- 编排原语从"automations + Kanban 手动流转"升级为 **一个 `wechat-article` Task**：`params: [topic(enum from topics.md 由 agent 现场生成), draft_path]`，节点 `check → format → cover → publish`，`skills: [wechat-publish, dbs-ai-check, dbs-content-risk-check, dbs-wechat-html, zerspace-illustrations]`，`cwd` = meta-repo 根，`acceptance_criteria` 写"草稿箱里存在 media_id 且 topics.md 状态已更新"。automations 只负责定时**提醒/起 Task**。
+- Kanban 卡片 = Task 及其子会话的聚合状态，不用自己维护列流转。

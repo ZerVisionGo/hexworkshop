@@ -134,4 +134,6 @@ scripts/           构建脚本（electron-build-*.ts、build-server.ts）
 - **Sources** 的 `api` 类型不支持 multipart，公众号推草稿（要传封面图）走 `tools/mp-kit` CLI + Bash，不做成 source
 - **Automations**：`prompt` 动作 = 新建会话（默认 `safe` 只读，要写文件需在 matcher 上给 `ask`/`allow-all`，或在 workspace `permissions.json` 的 `allowedWritePaths` 放行）；`script` 动作只透传 `CRAFT_*` 环境变量、路径须在 workspace 内。流水线状态用 label / status 表达，`LabelAdd` / `SessionStatusChange` 可触发下一步
 - **Pages** = 定时脚本写 `data/snapshot.json` + 自带 `index.html`，从不起 agent 会话——数据回流仪表盘用它
+- **Tasks**（`<workspace>/tasks/<slug>/task.yaml`）= 带 `params` / `cwd` / `skills` / `acceptance_criteria` / repair loop 的 DAG，每节点一个子会话，runs 落盘——这是原 Hex Workshop "任务 md" 的完整对应物，流水线优先用它而不是手写 automations
+- **官方文档落后源码半个版本**（skills 层级、globs 自动激活、automation 动作类型都以源码为准），对照表见 `docs/hexworkshop/project-analysis.md` 附二
 - 公众号发文流水线的 skill + CLI 是壳无关的，设计在 meta-repo 侧，工坊只负责调用

@@ -954,6 +954,30 @@ sequenceDiagram
 <tr><td>远程固定 IP（白名单）</td><td>headless server 跑在 VPS，桌面端连 <code>wss://</code></td><td>否</td></tr></tbody></table></div>
 <p>需要写的新东西只有两件：<code>wechat-publish</code> 的 <code>SKILL.md</code>（放 meta-repo <code>.claude/skills/</code>，经软链被识别）和 <code>tools/mp-kit</code> CLI。</p>
 </section>
+<section class="section" id="appendix">
+<h2 class="section-title">附二：官方文档（thecraftagents.com/docs）对照与补充（2026-09-19）</h2>
+<p>读了 introduction / skills / browser / api-discovery / rich-output / automations / permissions / working-directory / kanban / tasks / labels auto-rules / server headless / environment-variables。<strong>文档整体落后源码半个版本</strong>，以下按"文档说 / 源码是"记录：</p>
+<div class="table-wrapper"><table><thead><tr><th>主题</th><th>文档说</th><th>源码（v0.13.3）是</th><th>采信</th></tr></thead><tbody><tr><td>Skill 目录层级</td><td>两层：workspace + 内置</td><td>三层：<code>~/.agents/skills/</code> &lt; workspace &lt; <code>&lt;cwd&gt;/.agents/skills/</code>（Issue #171）</td><td>源码</td></tr>
+<tr><td>Skill <code>globs</code> 自动激活</td><td>"匹配文件模式时自动激活"</td><td><code>globs</code> 只被解析进 <code>SkillMetadata</code>，运行时<strong>没有任何引用</strong></td><td>源码：不存在自动激活</td></tr>
+<tr><td>上下文文件</td><td>只提 CLAUDE.md "自动注入"</td><td><code>CONTEXT_FILE_PATTERNS = ['agents.md','claude.md']</code>，大小写不敏感、递归发现（monorepo），<strong>列在系统提示词里让模型自己 Read</strong>（为了压缩后仍在）</td><td>源码：AGENTS.md 一等公民</td></tr>
+<tr><td>Automation 动作</td><td><code>command</code>（shell）+ <code>prompt</code>；<code>"version": 2</code></td><td><code>prompt</code> + <code>webhook</code> + <code>script</code>（argv spawn，<strong>无 shell</strong>）；<code>version</code> 可选</td><td>源码</td></tr>
+<tr><td><code>allowedWritePaths</code></td><td>Explore 模式下允许写入匹配 glob 的文件</td><td>类型里有，判定逻辑未读</td><td>文档（解决了"未知项 2"，仍需实跑）</td></tr>
+<tr><td>Explore 模式 Bash</td><td>安全命令也<strong>禁止</strong> <code>&amp;&amp;</code> `\</td><td>\</td><td><code> </code>;<code> </code>\</td><td><code> </code>&gt;<code> </code>$()`</td><td>—</td><td>影响 <code>mp-kit push</code> 的写法：单命令、无管道</td></tr>
+<tr><td>环境变量</td><td>无 <code>CRAFT_WH_*</code></td><td>内置 <code>docs/automations.md</code> 有 <code>CRAFT_WH_*</code>（webhook 密钥透传）</td><td>源码/内置文档</td></tr></tbody></table></div>
+<h3 class="subsection-title">文档带来的新发现</h3>
+<ol>
+<li><strong>Tasks = 真正的流水线原语</strong>（<code>&lt;workspace&gt;/tasks/&lt;slug&gt;/task.yaml</code>，<code>packages/shared/src/tasks/schema.ts</code>）。一个 DAG：<code>nodes[]</code> 每个节点是一个子会话，<code>depends_on</code> 传递上游 <code>${nodes.&lt;id&gt;.output}</code>；顶层有 <strong><code>params[]</code>（string/number/boolean/enum/json/text，带 default/enum）→ <code>${params.&lt;name&gt;}</code></strong>、<code>cwd</code>、<code>skills[]</code>（子会话 prompt 自动带 <code>[skill:slug]</code>）、<code>sources[]</code>、<code>defaults.permissionMode</code>；节点级 <code>permissionMode</code> / <code>labels</code> / <code>status</code> / <code>retry</code> / <code>timeout</code>；<code>acceptance_criteria</code> 由 orchestrator 打分，FAIL 进 repair loop（默认 3 次）；每次运行落 <code>tasks/&lt;slug&gt;/runs/&lt;runId&gt;/</code>。<strong>这就是 Hex Workshop 原设计里"frontmatter 表单 + prompt 模板 + runs/ 记录"的完整对应物</strong>，且多了验收与重试。<code>approval</code> / <code>route</code> / <code>loop</code> 等控制流字段"解析但未执行"（P4）。</li>
+<li><strong>浏览器工具共享你已登录的本机浏览器 cookie，远程 workspace 也是驱动本地浏览器</strong>。"API discovery"模式：agent 观察页面网络请求 → 识别内部 JSON API → 在页面上下文 <code>fetch(..., {credentials:'include'})</code> 并行拉取。对公众号后台（mp.weixin.qq.com 登录态）意味着<strong>数据回流可以不导 xlsx</strong>，但登录态会过期、页面 API 无契约——留作 v2 选项，v1 仍用 xlsx + Pages。</li>
+<li><strong>Rich output</strong>：HTML preview（沙箱 iframe）、data table、spreadsheet（可导 xlsx/csv）、image / PDF / markdown 预览。<code>dbs-wechat-html</code> 的产物可以直接在会话里预览，封面图直接内嵌。</li>
+<li><strong>Labels auto-rules</strong>：<code>labels/config.json</code> 里给标签配正则，用户消息命中即自动打标（只扫用户消息，不扫 agent 输出）。可用来把"发 #05"这类口令变成 <code>LabelAdd</code> 事件触发自动化。</li>
+<li><strong>Headless</strong>：官方镜像 <code>ghcr.io/lukilabs/craft-agents-server</code>，<code>CRAFT_RPC_HOST=0.0.0.0</code> + TLS 必需；Web UI 同端口 9100。</li>
+</ol>
+<h3 class="subsection-title">对发文工作流落位的修正</h3>
+<ul>
+<li>编排原语从"automations + Kanban 手动流转"升级为 <strong>一个 <code>wechat-article</code> Task</strong>：<code>params: [topic(enum from topics.md 由 agent 现场生成), draft_path]</code>，节点 <code>check → format → cover → publish</code>，<code>skills: [wechat-publish, dbs-ai-check, dbs-content-risk-check, dbs-wechat-html, zerspace-illustrations]</code>，<code>cwd</code> = meta-repo 根，<code>acceptance_criteria</code> 写"草稿箱里存在 media_id 且 topics.md 状态已更新"。automations 只负责定时<strong>提醒/起 Task</strong>。</li>
+<li>Kanban 卡片 = Task 及其子会话的聚合状态，不用自己维护列流转。</li>
+</ul>
+</section>
 
   </main>
 
