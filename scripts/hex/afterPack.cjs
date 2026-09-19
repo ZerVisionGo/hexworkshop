@@ -1,24 +1,42 @@
-// hex afterPack：先跑上游的 afterPack（Liquid Glass 图标等），再删掉 app-update.yml。
+// hex afterPack：在签名之前整理 bundle。
 //
-// 为什么在这里删：electron-builder 在 afterPack 阶段（PublishManager 的系统监听器）
-// 写入 app-update.yml，用户 hook 总是最后执行，且都发生在签名之前——所以在这里删
-// 文件，签名会覆盖最终的 bundle；打包后再删会破坏 code signature 的 seal。
+// 1. 删掉 app-update.yml
+//    electron-builder 在 afterPack 阶段（PublishManager 的系统监听器）写入它，用户 hook 总是
+//    最后执行，且都发生在签名之前——所以在这里删，签名会覆盖最终的 bundle；打包后再删会破坏
+//    code signature 的 seal。不删的话自建的 app 会在上游发新版时被 electron-updater 换回官方版本。
 //
-// 为什么要删：electron-builder.yml 的 publish 指向官方更新源，不删的话自建的 app
-// 会在上游发新版时被 electron-updater 换回官方版本。
+// 2. 图标
+//    - 未改名（productName 仍是 Craft Agents）：调上游 afterPack，拷 Liquid Glass 的 Assets.car。
+//    - 改名（Hex Workshop）：不拷 Craft 的 Assets.car，并从 Info.plist 删掉 CFBundleIconName，
+//      让 macOS 回退到 electron-builder 写入的 icon.icns（我们自己的图标）。
 //
 // 通过 `electron-builder -c.afterPack=scripts/hex/afterPack.cjs` 传入（见 package-mac.sh），
 // 不改上游的 electron-builder.yml。
 const path = require('node:path')
 const fs = require('node:fs')
+const { execFileSync } = require('node:child_process')
 
+const UPSTREAM_PRODUCT_NAME = 'Craft Agents'
 const upstreamAfterPack = require(path.join(__dirname, '..', '..', 'apps', 'electron', 'scripts', 'afterPack.cjs'))
 
 module.exports = async function afterPack(context) {
-  await upstreamAfterPack(context)
+  const productName = context.packager.appInfo.productFilename
+  const appBundle = path.join(context.appOutDir, `${productName}.app`)
+  const resources = path.join(appBundle, 'Contents', 'Resources')
 
-  const appName = context.packager.appInfo.productFilename
-  const updateYml = path.join(context.appOutDir, `${appName}.app`, 'Contents', 'Resources', 'app-update.yml')
+  if (productName === UPSTREAM_PRODUCT_NAME) {
+    await upstreamAfterPack(context)
+  } else if (context.electronPlatformName === 'darwin') {
+    const plist = path.join(appBundle, 'Contents', 'Info.plist')
+    try {
+      execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Delete :CFBundleIconName', plist], { stdio: 'ignore' })
+      console.log('hex afterPack: removed CFBundleIconName (using icon.icns)')
+    } catch {
+      console.log('hex afterPack: CFBundleIconName not present')
+    }
+  }
+
+  const updateYml = path.join(resources, 'app-update.yml')
   if (fs.existsSync(updateYml)) {
     fs.rmSync(updateYml)
     console.log(`hex afterPack: removed ${updateYml}`)

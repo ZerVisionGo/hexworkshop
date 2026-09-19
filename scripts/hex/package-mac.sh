@@ -1,37 +1,62 @@
 #!/usr/bin/env bash
-# package-mac.sh — 把 fork 打成本机可用的 .app（不公证、不自动更新）。
+# package-mac.sh — 把 fork 打成本机可用的「Hex Workshop.app」（不公证、不自动更新）。
 #
 # 用法：
-#   bash scripts/hex/package-mac.sh --stage      # 首次 / bun install 后 / 同步上游后：先跑上游 build-dmg.sh 暂存
-#                                                #   bun 二进制、Claude SDK 原生二进制、ripgrep（只需一次）
+#   bash scripts/hex/package-mac.sh --stage      # 首次 / bun install 后 / 同步上游后：先跑上游 build-dmg.sh
+#                                                #   暂存 bun 二进制、Claude SDK 原生二进制、ripgrep（只需一次）
 #   bash scripts/hex/package-mac.sh              # 日常：只重新构建 + 打包（快）
-#   bash scripts/hex/package-mac.sh --install    # 打包后替换 /Applications 里的 app（会先确认）
+#   bash scripts/hex/package-mac.sh --install    # 打包后安装到 /Applications（会先确认）
+#   bash scripts/hex/package-mac.sh --vanilla    # 不改名，打成与官方同名的 Craft Agents.app（不能与官方共存）
 #   可组合：--stage --install
+#
+# 默认是「改名版」，与官方 app 完全隔离、可同时运行：
+#   productName / appId    Hex Workshop / com.zervisiongo.hexworkshop
+#                          → 独立的 ~/Library/Application Support/Hex Workshop（Chromium profile、内置浏览器 cookie、单实例锁）
+#   CRAFT_CONFIG_DIR       $HOME/.hexworkshop（通过 Info.plist 的 LSEnvironment 烤入，Finder 启动也生效）
+#                          → 独立的 workspaces / sessions / credentials / logs（依赖 fix/config-dir 补丁）
+#   CRAFT_DEEPLINK_SCHEME  hexworkshop://
+#   图标                   resources/hex/icon.icns（雨果 EVA 头像）
+#   首次使用需把官方的 workspace 拷过来：cp -R ~/.craft-agent/workspaces/<slug> ~/.hexworkshop/workspaces/
 #
 # 关键点：
 #   - app-update.yml 在 scripts/hex/afterPack.cjs 里、签名之前删掉，签名覆盖最终 bundle。
-#     （打包后再删会破坏 seal；ad-hoc --deep 重签又会丢 Electron 的 entitlements）
 #   - 签名：electron-builder 自动发现钥匙串里的 Apple Development 证书；没有证书时
 #     回退为带 entitlements 的 ad-hoc 签名，本机可开、不能分发。
-#   - 配置（~/.craft-agent/）不在 app 里，换 app 不影响 workspace / 凭据。
+#   - 上游文件一个不改：所有覆盖都走 electron-builder 的 -c.xxx 命令行参数。
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ARCH="${ARCH:-arm64}"
-APP_NAME="Craft Agents"                       # 与 electron-builder.yml 的 productName 一致
 ELECTRON_DIR="$ROOT_DIR/apps/electron"
-BUILT_APP="$ELECTRON_DIR/release/mac-$ARCH/$APP_NAME.app"
-TARGET_APP="/Applications/$APP_NAME.app"
 BACKUP_DIR="$HOME/Applications"
 
-DO_STAGE=0; DO_INSTALL=0
+DO_STAGE=0; DO_INSTALL=0; VANILLA=0
 for a in "$@"; do
   case "$a" in
     --stage) DO_STAGE=1 ;;
     --install) DO_INSTALL=1 ;;
+    --vanilla) VANILLA=1 ;;
     *) echo "未知参数：$a" >&2; exit 2 ;;
   esac
 done
+
+if [ "$VANILLA" -eq 1 ]; then
+  APP_NAME="Craft Agents"
+  BRAND_ARGS=()
+else
+  APP_NAME="Hex Workshop"
+  HEX_CONFIG_DIR="$HOME/.hexworkshop"
+  BRAND_ARGS=(
+    "-c.productName=$APP_NAME"
+    "-c.appId=com.zervisiongo.hexworkshop"
+    "-c.mac.icon=$ROOT_DIR/resources/hex/icon.icns"
+    "-c.mac.extendInfo.LSEnvironment.CRAFT_CONFIG_DIR=$HEX_CONFIG_DIR"
+    "-c.mac.extendInfo.LSEnvironment.CRAFT_APP_NAME=$APP_NAME"
+    "-c.mac.extendInfo.LSEnvironment.CRAFT_DEEPLINK_SCHEME=hexworkshop"
+  )
+fi
+BUILT_APP="$ELECTRON_DIR/release/mac-$ARCH/$APP_NAME.app"
+TARGET_APP="/Applications/$APP_NAME.app"
 
 cd "$ROOT_DIR"
 
@@ -50,11 +75,12 @@ done
 echo "== 构建 =="
 bun run electron:build
 
-echo "== 打包（自定义 afterPack 去掉 app-update.yml）=="
+echo "== 打包：${APP_NAME}（自定义 afterPack 去掉 app-update.yml）=="
 rm -rf "$ELECTRON_DIR/release/mac-$ARCH"
 ( cd "$ELECTRON_DIR" && npx electron-builder --mac "--$ARCH" \
     --config electron-builder.yml \
-    -c.afterPack="$ROOT_DIR/scripts/hex/afterPack.cjs" )
+    -c.afterPack="$ROOT_DIR/scripts/hex/afterPack.cjs" \
+    "${BRAND_ARGS[@]}" )
 
 [ -d "$BUILT_APP" ] || { echo "未找到构建产物：$BUILT_APP" >&2; exit 1; }
 [ ! -e "$BUILT_APP/Contents/Resources/app-update.yml" ] || { echo "app-update.yml 仍然存在，afterPack 未生效" >&2; exit 1; }
@@ -68,9 +94,14 @@ if ! codesign --verify --deep --strict "$BUILT_APP" 2>/dev/null; then
 fi
 codesign -dv "$BUILT_APP" 2>&1 | grep -E "^(Authority|Signature)" | head -2 || true
 
+PLIST="$BUILT_APP/Contents/Info.plist"
 echo
 echo "产物：$BUILT_APP"
-echo "版本：$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$BUILT_APP/Contents/Info.plist")  commit：$(git rev-parse --short HEAD)"
+echo "版本：$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")  commit：$(git rev-parse --short HEAD)"
+echo "bundle id：$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST")"
+if [ "$VANILLA" -eq 0 ]; then
+  echo "配置目录：$(/usr/libexec/PlistBuddy -c 'Print :LSEnvironment:CRAFT_CONFIG_DIR' "$PLIST" 2>/dev/null || echo '未写入 LSEnvironment！')"
+fi
 
 if [ "$DO_INSTALL" -ne 1 ]; then
   echo

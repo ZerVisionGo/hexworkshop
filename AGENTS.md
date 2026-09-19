@@ -31,7 +31,7 @@ bug 修复走 `fix/*` → 上游 PR。**不要把修复直接合进 `zer/main`**
 
 ### 品牌
 
-不使用 "Craft" / "Craft Agents" 名称、logo 命名自己的东西（上游 `TRADEMARK.md`）。自己用不需要改 `productName` / `appId`；**只有要对外分发安装包时**才改 `apps/electron/electron-builder.yml` 的 `appId` / `productName` 和图标。
+不使用 "Craft" / "Craft Agents" 名称、logo 命名自己的东西（上游 `TRADEMARK.md`）。自建包已改名为 Hex Workshop——但**不是改 `electron-builder.yml`**，而是 `scripts/hex/package-mac.sh` 用 `-c.productName` / `-c.appId` / `-c.mac.icon` 命令行覆盖，上游文件零改动。图标源图 `resources/hex/icon-1024.png`（雨果 EVA 头像），改图后重新生成 `icon.icns`。
 
 ### 提交
 
@@ -76,11 +76,15 @@ bun run typecheck:all
 bun run test
 bun run lint
 
-# 本机打包（不签名、不公证）
-bun run electron:dist:dev:mac
-# 打包后必须删掉更新清单，否则 electron-updater 会把 app 拉回官方版本：
-rm "apps/electron/release/mac-arm64/Craft Agents.app/Contents/Resources/app-update.yml"
-codesign --force --deep -s - "apps/electron/release/mac-arm64/Craft Agents.app"   # ad-hoc 签名
+# 本机打包成「Hex Workshop.app」（与官方 app 完全隔离、可同时运行；不公证）
+bash scripts/hex/package-mac.sh --stage      # 首次 / bun install 后 / 同步上游后（暂存 bun、Claude SDK 二进制）
+bash scripts/hex/package-mac.sh              # 日常重新打包
+bash scripts/hex/package-mac.sh --install    # 安装到 /Applications（会确认）
+# 改名版细节：productName/appId=Hex Workshop/com.zervisiongo.hexworkshop，配置目录 ~/.hexworkshop
+# （LSEnvironment 烤入，依赖 fix/config-dir 补丁），图标 resources/hex/icon.icns，
+# app-update.yml 由 scripts/hex/afterPack.cjs 在签名前删除。首次使用把官方数据拷过来：
+#   cp ~/.craft-agent/{config.json,credentials.enc} ~/.hexworkshop/ && cp -R ~/.craft-agent/workspaces/<slug> ~/.hexworkshop/workspaces/
+#   （credentials.enc 用机器 UUID 加密，同机可直接复用）
 
 # 同步上游（在 zer/main 上）
 git fetch upstream
