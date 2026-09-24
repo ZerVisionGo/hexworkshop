@@ -2,7 +2,7 @@
  * Cross-platform resources copy script
  */
 
-import { existsSync, cpSync } from "fs";
+import { existsSync, cpSync, copyFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
 const ROOT_DIR = join(import.meta.dir, "..");
@@ -16,4 +16,17 @@ if (existsSync(srcDir)) {
   console.log("📦 Copied resources to dist");
 } else {
   console.log("⚠️ No resources directory found");
+}
+
+for (const server of ["session-mcp-server", "pi-agent-server"]) {
+  const source = join(ROOT_DIR, "packages", server, "dist", "index.js");
+  const destination = join(destDir, server, "index.js");
+
+  if (!existsSync(source)) {
+    throw new Error(`Missing ${server} build output: ${source}`);
+  }
+
+  mkdirSync(join(destDir, server), { recursive: true });
+  copyFileSync(source, destination);
+  console.log(`📦 Copied ${server} to dist resources`);
 }
